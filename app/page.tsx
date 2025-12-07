@@ -6,7 +6,7 @@ export default function Home() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-background via-background to-secondary p-4">
       <div className="mx-auto max-w-2xl text-center">
-        <h1 className="text-4xl font-bold text-foreground md:text-5xl">Welcome to Auth Demo</h1>
+        <h1 className="text-4xl font-bold text-foreground md:text-5xl">Welcome to HubCredo Assignment</h1>
         <p className="mt-4 text-lg text-muted-foreground">
           A complete authentication system built with Next.js, TypeScript, JWT, and Zod validation
         </p>
