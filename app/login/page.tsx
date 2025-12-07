@@ -1,4 +1,4 @@
-import { LoginForm } from "@/components/auth/login-form"
+import { LoginForm } from '@/components/auth/login-form';
 
 export default function LoginPage() {
   return (
@@ -6,10 +6,12 @@ export default function LoginPage() {
       <div className="w-full">
         <div className="mb-8 text-center">
           <h1 className="text-3xl font-bold text-foreground">Welcome Back</h1>
-          <p className="mt-2 text-muted-foreground">Log in to access your account</p>
+          <p className="mt-2 text-muted-foreground">
+            Log in to access your account
+          </p>
         </div>
         <LoginForm />
       </div>
     </div>
-  )
+  );
 }

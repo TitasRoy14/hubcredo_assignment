@@ -1,93 +1,128 @@
-"use client"
+'use client';
 
-import type React from "react"
-import { useState } from "react"
-import { useRouter } from "next/navigation"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { SignUpSchema } from "@/lib/schemas"
-import { authClient } from "@/lib/auth-client"
-import { AlertCircle } from "lucide-react"
-import { Spinner } from "@/components/ui/spinner"
+import type React from 'react';
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
+import { SignUpSchema } from '@/lib/schemas';
+import { authClient } from '@/lib/auth-client';
+import { AlertCircle, CheckCircle } from 'lucide-react';
+import { Spinner } from '@/components/ui/spinner';
 
 export function SignUpForm() {
-  const router = useRouter()
-  const [loading, setLoading] = useState(false)
-  const [errors, setErrors] = useState<Record<string, string>>({})
-  const [generalError, setGeneralError] = useState("")
+  const router = useRouter();
+  const [loading, setLoading] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [generalError, setGeneralError] = useState('');
+  const [verificationSent, setVerificationSent] = useState(false);
   const [formData, setFormData] = useState({
-    name: "",
-    email: "",
-    password: "",
-    confirmPassword: "",
-  })
+    name: '',
+    email: '',
+    password: '',
+    confirmPassword: '',
+  });
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target
-    setFormData((prev) => ({ ...prev, [name]: value }))
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
     if (errors[name]) {
-      setErrors((prev) => ({ ...prev, [name]: "" }))
+      setErrors((prev) => ({ ...prev, [name]: '' }));
     }
-  }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setLoading(true)
-    setErrors({})
-    setGeneralError("")
+    e.preventDefault();
+    setLoading(true);
+    setErrors({});
+    setGeneralError('');
 
-    const validation = SignUpSchema.safeParse(formData)
+    const validation = SignUpSchema.safeParse(formData);
     if (!validation.success) {
-      const newErrors: Record<string, string> = {}
+      const newErrors: Record<string, string> = {};
       validation.error.errors.forEach((err) => {
         if (err.path[0]) {
-          newErrors[err.path[0] as string] = err.message
+          newErrors[err.path[0] as string] = err.message;
         }
-      })
-      setErrors(newErrors)
-      setLoading(false)
-      return
+      });
+      setErrors(newErrors);
+      setLoading(false);
+      return;
     }
 
     try {
-      // DBOPS: Call Better Auth sign up endpoint
       const response = await authClient.signUp.email({
         email: formData.email,
         password: formData.password,
         name: formData.name,
-        callbackURL: "/dashboard",
-      })
+      });
 
       if (response.error) {
-        setGeneralError(response.error.message || "Sign up failed")
-        setLoading(false)
-        return
+        setGeneralError(response.error.message || 'Sign up failed');
+        setLoading(false);
+        return;
       }
 
       // DBOPS: Trigger n8n webhook for new signup
       try {
-        await fetch("/api/webhooks/signup", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
+        await fetch('/api/webhooks/signup', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             id: response.data?.user?.id,
             name: formData.name,
             email: formData.email,
             signupDate: new Date().toISOString(),
           }),
-        })
+        });
       } catch (err) {
-        console.error("Failed to trigger signup webhook:", err)
+        console.error('Failed to trigger signup webhook:', err);
       }
 
-      router.push("/dashboard")
+      setVerificationSent(true);
     } catch (err) {
-      setGeneralError("An error occurred. Please try again.")
-      console.error(err)
+      setGeneralError('An error occurred. Please try again.');
+      console.error(err);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
+  };
+
+  if (verificationSent) {
+    return (
+      <Card className="w-full max-w-md">
+        <CardHeader>
+          <CardTitle>Check Your Email</CardTitle>
+          <CardDescription>Verification link sent</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col items-center gap-4 text-center">
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-green-50">
+              <CheckCircle className="h-6 w-6 text-green-600" />
+            </div>
+            <p className="text-sm text-muted-foreground">
+              We've sent a verification link to{' '}
+              <strong>{formData.email}</strong>. Please check your email and
+              click the link to verify your account.
+            </p>
+            <Button
+              variant="outline"
+              onClick={() => router.push('/login')}
+              className="w-full"
+            >
+              Go to Login
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    );
   }
 
   return (
@@ -97,7 +132,7 @@ export function SignUpForm() {
         <CardDescription>Join us to get started</CardDescription>
       </CardHeader>
       <CardContent>
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <div className="space-y-4">
           {generalError && (
             <div className="flex items-center gap-2 rounded-md bg-red-50 p-3 text-sm text-red-800">
               <AlertCircle className="h-4 w-4 flex-shrink-0" />
@@ -106,7 +141,10 @@ export function SignUpForm() {
           )}
 
           <div className="space-y-2">
-            <label htmlFor="name" className="text-sm font-medium text-foreground">
+            <label
+              htmlFor="name"
+              className="text-sm font-medium text-foreground"
+            >
               Full Name
             </label>
             <Input
@@ -116,13 +154,18 @@ export function SignUpForm() {
               value={formData.name}
               onChange={handleChange}
               disabled={loading}
-              className={errors.name ? "border-red-500" : ""}
+              className={errors.name ? 'border-red-500' : ''}
             />
-            {errors.name && <p className="text-sm text-red-500">{errors.name}</p>}
+            {errors.name && (
+              <p className="text-sm text-red-500">{errors.name}</p>
+            )}
           </div>
 
           <div className="space-y-2">
-            <label htmlFor="email" className="text-sm font-medium text-foreground">
+            <label
+              htmlFor="email"
+              className="text-sm font-medium text-foreground"
+            >
               Email
             </label>
             <Input
@@ -133,13 +176,18 @@ export function SignUpForm() {
               value={formData.email}
               onChange={handleChange}
               disabled={loading}
-              className={errors.email ? "border-red-500" : ""}
+              className={errors.email ? 'border-red-500' : ''}
             />
-            {errors.email && <p className="text-sm text-red-500">{errors.email}</p>}
+            {errors.email && (
+              <p className="text-sm text-red-500">{errors.email}</p>
+            )}
           </div>
 
           <div className="space-y-2">
-            <label htmlFor="password" className="text-sm font-medium text-foreground">
+            <label
+              htmlFor="password"
+              className="text-sm font-medium text-foreground"
+            >
               Password
             </label>
             <Input
@@ -150,13 +198,18 @@ export function SignUpForm() {
               value={formData.password}
               onChange={handleChange}
               disabled={loading}
-              className={errors.password ? "border-red-500" : ""}
+              className={errors.password ? 'border-red-500' : ''}
             />
-            {errors.password && <p className="text-sm text-red-500">{errors.password}</p>}
+            {errors.password && (
+              <p className="text-sm text-red-500">{errors.password}</p>
+            )}
           </div>
 
           <div className="space-y-2">
-            <label htmlFor="confirmPassword" className="text-sm font-medium text-foreground">
+            <label
+              htmlFor="confirmPassword"
+              className="text-sm font-medium text-foreground"
+            >
               Confirm Password
             </label>
             <Input
@@ -167,30 +220,40 @@ export function SignUpForm() {
               value={formData.confirmPassword}
               onChange={handleChange}
               disabled={loading}
-              className={errors.confirmPassword ? "border-red-500" : ""}
+              className={errors.confirmPassword ? 'border-red-500' : ''}
             />
-            {errors.confirmPassword && <p className="text-sm text-red-500">{errors.confirmPassword}</p>}
+            {errors.confirmPassword && (
+              <p className="text-sm text-red-500">{errors.confirmPassword}</p>
+            )}
           </div>
 
-          <Button type="submit" className="w-full" disabled={loading}>
+          <Button
+            type="button"
+            onClick={handleSubmit}
+            className="w-full"
+            disabled={loading}
+          >
             {loading ? (
               <div className="flex items-center gap-2">
                 <Spinner className="h-4 w-4" />
                 Creating account...
               </div>
             ) : (
-              "Sign Up"
+              'Sign Up'
             )}
           </Button>
 
           <p className="text-center text-sm text-muted-foreground">
-            Already have an account?{" "}
-            <a href="/login" className="font-medium text-primary hover:underline">
+            Already have an account?{' '}
+            <a
+              href="/login"
+              className="font-medium text-primary hover:underline"
+            >
               Log in
             </a>
           </p>
-        </form>
+        </div>
       </CardContent>
     </Card>
-  )
+  );
 }
