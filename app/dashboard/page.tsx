@@ -1,50 +1,61 @@
-"use client"
+'use client';
 
-import { useEffect, useState } from "react"
-import { useRouter } from "next/navigation"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { getCurrentUser, clearUser, getToken } from "@/lib/auth"
-import { LogOut, User, Mail, Clock } from "lucide-react"
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { Button } from '@/components/ui/button';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
+import { useSession, signOut } from '@/lib/auth-client';
+import { LogOut, User, Mail, Calendar } from 'lucide-react';
+import { Spinner } from '@/components/ui/spinner';
 
 export default function DashboardPage() {
-  const router = useRouter()
-  const [user, setUser] = useState<{ id: string; email: string; name: string } | null>(null)
-  const [loading, setLoading] = useState(true)
+  const router = useRouter();
+  const { data: session, isPending } = useSession();
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    // DBOPS: Get current user from localStorage
-    const currentUser = getCurrentUser()
-    const token = getToken()
+    setMounted(true);
+  }, []);
 
-    if (!currentUser || !token) {
-      router.push("/login")
-    } else {
-      setUser(currentUser)
+  useEffect(() => {
+    if (mounted && !isPending && !session) {
+      router.push('/login');
     }
-    setLoading(false)
-  }, [router])
+  }, [mounted, isPending, session, router]);
 
-  // DBOPS: Handle logout
-  const handleLogout = () => {
-    clearUser()
-    router.push("/login")
-  }
+  const handleLogout = async () => {
+    // DBOPS: Call Better Auth sign out method
+    await signOut({
+      fetchOptions: {
+        onSuccess: () => {
+          router.push('/login');
+        },
+      },
+    });
+  };
 
-  if (loading) {
+  if (!mounted || isPending) {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <div className="text-center">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
+          <Spinner className="mx-auto h-8 w-8" />
           <p className="mt-4 text-muted-foreground">Loading...</p>
         </div>
       </div>
-    )
+    );
   }
 
-  if (!user) {
-    return null
+  if (!session?.user) {
+    return null;
   }
+
+  const user = session.user;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background to-secondary p-4">
@@ -53,9 +64,15 @@ export default function DashboardPage() {
         <div className="mb-8 flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold text-foreground">Dashboard</h1>
-            <p className="mt-1 text-muted-foreground">Welcome back, {user.name}!</p>
+            <p className="mt-1 text-muted-foreground">
+              Welcome back, {user.name}!
+            </p>
           </div>
-          <Button variant="outline" onClick={handleLogout} className="gap-2 bg-transparent">
+          <Button
+            variant="outline"
+            onClick={handleLogout}
+            className="gap-2 bg-transparent"
+          >
             <LogOut className="h-4 w-4" />
             Logout
           </Button>
@@ -65,27 +82,35 @@ export default function DashboardPage() {
         <Card className="mb-8 border-2 border-primary/20">
           <CardHeader>
             <CardTitle>Welcome to Your Dashboard</CardTitle>
-            <CardDescription>You have successfully logged in</CardDescription>
+            <CardDescription>
+              You have successfully logged in with Better Auth
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex items-center gap-3 rounded-lg bg-primary/5 p-4">
               <User className="h-5 w-5 text-primary" />
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Full Name</p>
-                <p className="text-foreground">{user.name}</p>
+                <p className="text-sm font-medium text-muted-foreground">
+                  Full Name
+                </p>
+                <p className="text-foreground">{user.name || 'N/A'}</p>
               </div>
             </div>
             <div className="flex items-center gap-3 rounded-lg bg-primary/5 p-4">
               <Mail className="h-5 w-5 text-primary" />
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Email Address</p>
+                <p className="text-sm font-medium text-muted-foreground">
+                  Email Address
+                </p>
                 <p className="text-foreground">{user.email}</p>
               </div>
             </div>
             <div className="flex items-center gap-3 rounded-lg bg-primary/5 p-4">
-              <Clock className="h-5 w-5 text-primary" />
+              <Calendar className="h-5 w-5 text-primary" />
               <div>
-                <p className="text-sm font-medium text-muted-foreground">User ID</p>
+                <p className="text-sm font-medium text-muted-foreground">
+                  User ID
+                </p>
                 <p className="font-mono text-foreground">{user.id}</p>
               </div>
             </div>
@@ -101,7 +126,8 @@ export default function DashboardPage() {
             </CardHeader>
             <CardContent>
               <p className="text-sm text-muted-foreground">
-                Your account has been successfully created. You can now access all features of the platform.
+                Your account has been successfully created with Better Auth. You
+                can now access all features of the platform securely.
               </p>
             </CardContent>
           </Card>
@@ -113,12 +139,13 @@ export default function DashboardPage() {
             </CardHeader>
             <CardContent>
               <p className="text-sm text-muted-foreground">
-                A welcome email has been sent to {user.email}. Check your inbox for more information.
+                A welcome email has been sent to {user.email}. Check your inbox
+                and n8n will automatically store your data.
               </p>
             </CardContent>
           </Card>
         </div>
       </div>
     </div>
-  )
+  );
 }

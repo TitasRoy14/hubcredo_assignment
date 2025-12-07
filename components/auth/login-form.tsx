@@ -1,15 +1,15 @@
 "use client"
 
 import type React from "react"
-
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { LoginSchema } from "@/lib/schemas"
-import { setUser, generateToken } from "@/lib/auth"
+import { authClient } from "@/lib/auth-client"
 import { AlertCircle } from "lucide-react"
+import { Spinner } from "@/components/ui/spinner"
 
 export function LoginForm() {
   const router = useRouter()
@@ -21,7 +21,6 @@ export function LoginForm() {
     password: "",
   })
 
-  // DBOPS: Handle input changes
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target
     setFormData((prev) => ({ ...prev, [name]: value }))
@@ -30,14 +29,12 @@ export function LoginForm() {
     }
   }
 
-  // DBOPS: Handle login submission
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
     setErrors({})
     setGeneralError("")
 
-    // Validate form data with Zod
     const validation = LoginSchema.safeParse(formData)
     if (!validation.success) {
       const newErrors: Record<string, string> = {}
@@ -52,34 +49,19 @@ export function LoginForm() {
     }
 
     try {
-      // DBOPS: Check credentials against localStorage
-      const users = JSON.parse(localStorage.getItem("users") || "[]")
-      const user = users.find((u: any) => u.email === formData.email)
+      // DBOPS: Call Better Auth sign in endpoint
+      const response = await authClient.signIn.email({
+        email: formData.email,
+        password: formData.password,
+        callbackURL: "/dashboard",
+      })
 
-      if (!user || user.password !== formData.password) {
-        setGeneralError("Invalid email or password")
+      if (response.error) {
+        setGeneralError(response.error.message || "Invalid credentials")
         setLoading(false)
         return
       }
 
-      // DBOPS: Generate JWT token
-      const token = await generateToken({
-        id: user.id,
-        email: user.email,
-        name: user.name,
-      })
-
-      // DBOPS: Store user and token
-      setUser(
-        {
-          id: user.id,
-          email: user.email,
-          name: user.name,
-        },
-        token,
-      )
-
-      // Redirect to dashboard
       router.push("/dashboard")
     } catch (err) {
       setGeneralError("An error occurred. Please try again.")
@@ -139,7 +121,14 @@ export function LoginForm() {
           </div>
 
           <Button type="submit" className="w-full" disabled={loading}>
-            {loading ? "Logging in..." : "Log In"}
+            {loading ? (
+              <div className="flex items-center gap-2">
+                <Spinner className="h-4 w-4" />
+                Logging in...
+              </div>
+            ) : (
+              "Log In"
+            )}
           </Button>
 
           <p className="text-center text-sm text-muted-foreground">

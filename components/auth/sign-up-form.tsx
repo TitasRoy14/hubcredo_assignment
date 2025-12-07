@@ -1,15 +1,15 @@
 "use client"
 
 import type React from "react"
-
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { SignUpSchema } from "@/lib/schemas"
-import { setUser, generateToken } from "@/lib/auth"
+import { authClient } from "@/lib/auth-client"
 import { AlertCircle } from "lucide-react"
+import { Spinner } from "@/components/ui/spinner"
 
 export function SignUpForm() {
   const router = useRouter()
@@ -23,24 +23,20 @@ export function SignUpForm() {
     confirmPassword: "",
   })
 
-  // DBOPS: Validate form data using Zod
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target
     setFormData((prev) => ({ ...prev, [name]: value }))
-    // Clear field error when user starts typing
     if (errors[name]) {
       setErrors((prev) => ({ ...prev, [name]: "" }))
     }
   }
 
-  // DBOPS: Handle sign up submission
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
     setErrors({})
     setGeneralError("")
 
-    // Validate form data
     const validation = SignUpSchema.safeParse(formData)
     if (!validation.success) {
       const newErrors: Record<string, string> = {}
@@ -55,54 +51,29 @@ export function SignUpForm() {
     }
 
     try {
-      // DBOPS: Check if user already exists in localStorage
-      const existingUsers = JSON.parse(localStorage.getItem("users") || "[]")
-      const userExists = existingUsers.some((user: any) => user.email === formData.email)
+      // DBOPS: Call Better Auth sign up endpoint
+      const response = await authClient.signUp.email({
+        email: formData.email,
+        password: formData.password,
+        name: formData.name,
+        callbackURL: "/dashboard",
+      })
 
-      if (userExists) {
-        setGeneralError("Email already registered")
+      if (response.error) {
+        setGeneralError(response.error.message || "Sign up failed")
         setLoading(false)
         return
       }
 
-      // DBOPS: Create new user
-      const newUser = {
-        id: Date.now().toString(),
-        name: formData.name,
-        email: formData.email,
-        password: formData.password, // NOTE: In production, use bcrypt to hash passwords
-      }
-
-      // DBOPS: Store user in localStorage
-      existingUsers.push(newUser)
-      localStorage.setItem("users", JSON.stringify(existingUsers))
-
-      // DBOPS: Generate JWT token
-      const token = await generateToken({
-        id: newUser.id,
-        email: newUser.email,
-        name: newUser.name,
-      })
-
-      // DBOPS: Store current user and token
-      setUser(
-        {
-          id: newUser.id,
-          email: newUser.email,
-          name: newUser.name,
-        },
-        token,
-      )
-
-      // Trigger n8n webhook for new signup
+      // DBOPS: Trigger n8n webhook for new signup
       try {
         await fetch("/api/webhooks/signup", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            id: newUser.id,
-            name: newUser.name,
-            email: newUser.email,
+            id: response.data?.user?.id,
+            name: formData.name,
+            email: formData.email,
             signupDate: new Date().toISOString(),
           }),
         })
@@ -110,7 +81,6 @@ export function SignUpForm() {
         console.error("Failed to trigger signup webhook:", err)
       }
 
-      // Redirect to dashboard
       router.push("/dashboard")
     } catch (err) {
       setGeneralError("An error occurred. Please try again.")
@@ -203,7 +173,14 @@ export function SignUpForm() {
           </div>
 
           <Button type="submit" className="w-full" disabled={loading}>
-            {loading ? "Creating account..." : "Sign Up"}
+            {loading ? (
+              <div className="flex items-center gap-2">
+                <Spinner className="h-4 w-4" />
+                Creating account...
+              </div>
+            ) : (
+              "Sign Up"
+            )}
           </Button>
 
           <p className="text-center text-sm text-muted-foreground">
